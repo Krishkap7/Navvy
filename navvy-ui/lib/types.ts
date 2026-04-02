@@ -8,4 +8,10 @@ export interface Activity {
   address: string;
 }
 
+export interface RouteSegment {
+  from_index: number;
+  to_index: number;
+  polyline: [number, number][]; // [lat, lng] pairs
+}
+
 export type Itinerary = Activity[];

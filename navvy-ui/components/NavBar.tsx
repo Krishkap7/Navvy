@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const links = [
   { href: "/dashboard", label: "Plan" },
@@ -15,11 +16,10 @@ export default function NavBar() {
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    const val = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith("navvy_user="))
-      ?.split("=")[1];
-    if (val) setEmail(decodeURIComponent(val));
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setEmail(user.email);
+    });
   }, []);
 
   const initial = email.charAt(0).toUpperCase() || "?";

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -22,9 +23,30 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return;
     }
 
-    document.cookie = `navvy_user=${encodeURIComponent(email)}; path=/; max-age=${
-      60 * 60 * 24 * 7
-    }`;
+    const supabase = createClient();
+
+    if (mode === "signup") {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+    }
+
     router.push("/dashboard");
     router.refresh();
   };

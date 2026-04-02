@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const preferences = [
   { label: "Dietary restrictions", placeholder: "e.g. vegetarian, gluten-free" },
@@ -15,17 +16,17 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    const val = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith("navvy_user="))
-      ?.split("=")[1];
-    if (val) setEmail(decodeURIComponent(val));
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setEmail(user.email);
+    });
   }, []);
 
   const initial = email.charAt(0).toUpperCase() || "?";
 
-  const logout = () => {
-    document.cookie = "navvy_user=; path=/; max-age=0";
+  const logout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     router.push("/");
   };
 

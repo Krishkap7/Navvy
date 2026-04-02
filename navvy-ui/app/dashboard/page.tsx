@@ -2,14 +2,38 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import type { Activity } from "@/lib/types";
+import type { Activity, RouteSegment } from "@/lib/types";
 import ItineraryCard from "@/components/ItineraryCard";
+
+function buildGoogleMapsUrl(activities: Activity[]): string {
+  const first = activities[0];
+  const last = activities[activities.length - 1];
+  const middle = activities.slice(1, -1);
+  const params = new URLSearchParams({
+    api: "1",
+    origin: `${first.lat},${first.lng}`,
+    destination: `${last.lat},${last.lng}`,
+    travelmode: "walking",
+  });
+  if (middle.length > 0) {
+    params.set("waypoints", middle.map((a) => `${a.lat},${a.lng}`).join("|"));
+  }
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function buildAppleMapsUrl(activities: Activity[]): string {
+  const [first, ...rest] = activities;
+  const base = `https://maps.apple.com/?saddr=${first.lat},${first.lng}`;
+  const dests = rest.map((a) => `daddr=${a.lat},${a.lng}`).join("&");
+  return `${base}&${dests}&dirflg=w`;
+}
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 export default function PlanPage() {
   const [prompt, setPrompt] = useState("");
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +42,7 @@ export default function PlanPage() {
     setLoading(true);
     setError(null);
     setActivities([]);
+    setRouteSegments([]);
 
     try {
       const res = await fetch("/api/generate-itinerary", {
@@ -29,6 +54,7 @@ export default function PlanPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setActivities(data.activities);
+      setRouteSegments(data.route_segments ?? []);
     } catch {
       setError("Could not reach the backend. Make sure it's running.");
     } finally {
@@ -111,6 +137,35 @@ export default function PlanPage() {
               {activities.map((activity, i) => (
                 <ItineraryCard key={i} activity={activity} index={i} />
               ))}
+
+              {/* Export to maps */}
+              {activities.length >= 2 && (
+                <div className="pt-1 space-y-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Open route in
+                  </p>
+                  <div className="flex gap-2">
+                    <a
+                      href={buildGoogleMapsUrl(activities)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <GoogleMapsIcon />
+                      Google Maps
+                    </a>
+                    <a
+                      href={buildAppleMapsUrl(activities)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <AppleMapsIcon />
+                      Apple Maps
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -133,8 +188,26 @@ export default function PlanPage() {
 
       {/* ── Map (fills remaining space) ── */}
       <div className="flex-1 relative">
-        <Map activities={activities} />
+        <Map activities={activities} routeSegments={routeSegments} />
       </div>
     </div>
+  );
+}
+
+function GoogleMapsIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function AppleMapsIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 8 12 12 14 14" />
+    </svg>
   );
 }
