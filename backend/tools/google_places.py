@@ -3,12 +3,16 @@ import os
 
 from agno.tools import Toolkit
 import googlemaps
+from googlemaps.convert import decode_polyline
 
 
 class GooglePlacesTool(Toolkit):
     def __init__(self):
-        self.client = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"), timeout=10)
-        super().__init__(name="google_places", tools=[self.search_places])
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_MAPS_API_KEY is required for GooglePlacesTool")
+        self.client = googlemaps.Client(key=api_key, timeout=10)
+        super().__init__(name="google_maps", tools=[self.search_places])
 
     def search_places(self, query: str) -> str:
         """
@@ -39,3 +43,32 @@ class GooglePlacesTool(Toolkit):
         except Exception as e:
             print(f"[GooglePlaces] error: {e}")
             return json.dumps([])
+
+def get_route_polyline(
+    lat1: float, lng1: float, lat2: float, lng2: float
+) -> list[list[float]]:
+    """
+    Convenience function for API route building. Uses Google Directions walking route.
+    """
+    try:
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return [[lat1, lng1], [lat2, lng2]]
+        client = googlemaps.Client(key=api_key, timeout=10)
+        routes = client.directions(
+            origin=(lat1, lng1),
+            destination=(lat2, lng2),
+            mode="walking",
+        )
+        if not routes:
+            return [[lat1, lng1], [lat2, lng2]]
+
+        encoded = routes[0].get("overview_polyline", {}).get("points")
+        if not encoded:
+            return [[lat1, lng1], [lat2, lng2]]
+
+        decoded = decode_polyline(encoded)
+        return [[point["lat"], point["lng"]] for point in decoded]
+    except Exception as e:
+        print(f"[GoogleRoutes] routing error: {e}, falling back to straight line")
+        return [[lat1, lng1], [lat2, lng2]]
